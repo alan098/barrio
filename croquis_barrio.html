@@ -34,26 +34,15 @@
   .ley{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--texto2);background:var(--card);border-radius:20px;padding:4px 10px;border:1px solid var(--borde);}
   .ley-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0;}
 
-  /* PANEL SHEETS — solo visible en modo edición */
-  .sheets-panel{
-    width:100%;margin:0 auto 1.2rem;
-    background:var(--card);border:1px solid var(--borde);border-radius:14px;
-    padding:1rem 1.2rem;display:none;flex-direction:column;gap:10px;
-  }
-  .sheets-panel.visible{display:flex;}
-  .sheets-panel-title{font-size:13px;font-weight:600;color:var(--texto);display:flex;align-items:center;gap:8px;}
-  .sheets-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-  .sheets-input{
-    flex:1;min-width:200px;font-family:'DM Mono',monospace;font-size:11px;
-    background:#f5f5f3;border:1px solid rgba(0,0,0,.12);border-radius:7px;
-    padding:7px 10px;outline:none;color:var(--texto);
-  }
-  .sheets-input:focus{border-color:var(--azul-b);background:#fff;}
-  .sheets-hint{font-size:11px;color:var(--texto2);}
-  .status-bar{padding:7px 12px;border-radius:8px;font-size:12px;display:none;}
-  .status-bar.info{background:#dbeeff;color:#0C447C;border:1px solid #B5D4F4;display:block;}
-  .status-bar.ok{background:#eaf3de;color:var(--verde-t);border:1px solid var(--verde-b);display:block;}
-  .status-bar.err{background:#fff0f0;color:var(--rojo-t);border:1px solid var(--rojo-b);display:block;}
+  /* LOADING */
+  .loading-bar{width:100%;margin:0 auto 1rem;padding:10px 14px;border-radius:8px;background:#dbeeff;font-size:12px;color:#0C447C;border:1px solid #B5D4F4;text-align:center;display:none;}
+  .loading-bar.visible{display:block;}
+
+  /* PANEL EDICION */
+  .edit-status{width:100%;margin:0 auto 1rem;padding:8px 14px;border-radius:8px;font-size:12px;display:none;}
+  .edit-status.ok{background:#eaf3de;color:var(--verde-t);border:1px solid var(--verde-b);display:block;}
+  .edit-status.err{background:#fff0f0;color:var(--rojo-t);border:1px solid var(--rojo-b);display:block;}
+  .edit-status.info{background:#dbeeff;color:#0C447C;border:1px solid #B5D4F4;display:block;}
 
   /* MAPA */
   .mapa-wrap{width:100%;margin:0 auto 1.2rem;background:#dae8cf;border-radius:16px;border:1px solid rgba(0,0,0,0.08);padding:24px 16px;display:flex;flex-direction:column;align-items:center;overflow-x:auto;}
@@ -103,8 +92,6 @@
   .btn:hover{background:#e8e8e4;}
   .btn.prim{background:#1a1a1a;color:#fff;border-color:#1a1a1a;}
   .btn.prim:hover{background:#333;}
-  .btn.verde{background:#eaf3de;color:var(--verde-t);border-color:var(--verde-b);}
-  .btn.verde:hover{background:#d5eabd;}
   .btn.danger{background:#fff0f0;color:var(--rojo-t);border-color:var(--rojo-b);}
   .btn.danger:hover{background:#ffe0e0;}
   .move-hint{font-size:11px;color:var(--texto2);align-self:center;}
@@ -145,7 +132,6 @@
     .lote,.btn-add{width:52px;height:64px;}
     .l-ico{font-size:15px;}
     .ed-grid{grid-template-columns:1fr;}
-    .sheets-input{min-width:100%;}
   }
 </style>
 </head>
@@ -157,21 +143,13 @@
     <p>Manzanas C y D — Nuevo loteamiento</p>
   </div>
   <div class="header-right">
-    <span class="badge-count" id="total-badge">19 lotes</span>
+    <span class="badge-count" id="total-badge">— lotes</span>
     <button class="btn-editar-toggle" id="btn-editar-toggle">✏️ Editar</button>
   </div>
 </header>
 
-<!-- PANEL SHEETS: solo aparece en modo edición -->
-<div class="sheets-panel" id="sheets-panel">
-  <div class="sheets-panel-title">📊 Sincronizar con Google Sheets</div>
-  <div class="sheets-row">
-    <input class="sheets-input" id="sheets-url" type="text" placeholder="Pegá el link CSV de tu Google Sheet..."/>
-    <button class="btn prim" id="btn-cargar">⬇ Cargar desde Sheets</button>
-  </div>
-  <div class="sheets-hint">Cada vez que cargues, el mapa se actualiza con los datos de la hoja. Luego podés editar lote por lote desde acá.</div>
-  <div class="status-bar" id="status-bar"></div>
-</div>
+<div class="loading-bar" id="loading-bar">⏳ Cargando datos del barrio...</div>
+<div class="edit-status" id="edit-status"></div>
 
 <div class="leyenda">
   <div class="ley"><div class="ley-dot" style="background:var(--verde)"></div>Habitada</div>
@@ -226,7 +204,7 @@
     </div>
   </div>
   <div class="ed-acciones">
-    <button class="btn prim" id="ed-guardar">✓ Guardar</button>
+    <button class="btn prim" id="ed-guardar">✓ Guardar en Sheets</button>
     <button class="btn" id="ed-izq">← Mover izq.</button>
     <button class="btn" id="ed-der">Mover der. →</button>
     <button class="btn danger" id="ed-eliminar">🗑 Eliminar</button>
@@ -286,84 +264,45 @@
 </div>
 
 <script>
-const PASS='barrio2024';
+// ══════════════════════════════════════════
+// CONFIGURACIÓN — solo tocá estas dos líneas
+const PASS = 'barrio2024';
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSncosor5wJzZovkjhTXhAq9qHTvz68DqUfzfGRvBg60lqpmwCV9DoIDQKesZHVWT4RN8FvoilLdc_V/pub?gid=0&single=true&output=csv';
+// Cuando tengas el Apps Script, pegá su URL acá:
+let APPS_SCRIPT_URL = ''; // ← vacío por ahora, lo completamos en el siguiente paso
+// ══════════════════════════════════════════
 
 const ICO={habitada:'🏠',pormudar:'🔑',mudando:'📦',construccion:'🏗️',baldio:'🌿',nohabla:'❓'};
 const ETI={habitada:'Habitada',pormudar:'No mudó aún',mudando:'Mudándose',construccion:'En construcción',baldio:'Baldío',nohabla:'Sin contacto'};
 const CLS={habitada:'e-h',pormudar:'e-pm',mudando:'e-mu',construccion:'e-co',baldio:'e-ba',nohabla:'e-no'};
 const DOT={habitada:'var(--verde-b)',pormudar:'var(--azul-b)',mudando:'var(--rosa-b)',construccion:'var(--naranja-b)',baldio:'var(--gris-b)',nohabla:'var(--rojo-b)'};
 
-let lotes=[
-  {id:'C1',mz:'C',est:'baldio',   nom:''},
-  {id:'C2',mz:'C',est:'baldio',   nom:''},
-  {id:'C3',mz:'C',est:'habitada', nom:''},
-  {id:'C4',mz:'C',est:'habitada', nom:''},
-  {id:'C5',mz:'C',est:'pormudar', nom:''},
-  {id:'C6',mz:'C',est:'habitada', nom:''},
-  {id:'C7',mz:'C',est:'pormudar', nom:''},
-  {id:'C8',mz:'C',est:'habitada', nom:''},
-  {id:'C9',mz:'C',est:'habitada', nom:''},
-  {id:'D1', mz:'D',est:'habitada',    nom:''},
-  {id:'D2', mz:'D',est:'habitada',    nom:''},
-  {id:'D3', mz:'D',est:'habitada',    nom:''},
-  {id:'D4', mz:'D',est:'pormudar',    nom:''},
-  {id:'D5', mz:'D',est:'habitada',    nom:''},
-  {id:'D6', mz:'D',est:'mudando',     nom:''},
-  {id:'D7', mz:'D',est:'nohabla',     nom:''},
-  {id:'D8', mz:'D',est:'habitada',    nom:''},
-  {id:'D9', mz:'D',est:'construccion',nom:''},
-  {id:'D10',mz:'D',est:'habitada',    nom:''},
-];
-
+let lotes=[];
 let selId=null,modalMz=null,modoEdicion=false;
-let nextId={C:10,D:11};
+let nextId={C:1,D:1};
 
-function guardar(){localStorage.setItem('barrio_v3',JSON.stringify(lotes));}
-function cargarLocal(){
-  const d=localStorage.getItem('barrio_v3');
-  if(d){try{lotes=JSON.parse(d);}catch(e){}}
-  const u=localStorage.getItem('barrio_sheets_url');
-  if(u) document.getElementById('sheets-url').value=u;
-  recalcNextId();
-}
-function lotesOf(mz){return lotes.filter(l=>l.mz===mz);}
-function idxOf(id){return lotes.findIndex(l=>l.id===id);}
-function numLabel(id){return id.replace(/[CD]/g,'');}
-function recalcNextId(){
-  nextId={C:1,D:1};
-  lotes.forEach(l=>{
-    const n=parseInt(l.id.replace(/[CD]/g,''))||0;
-    if(l.mz==='C'&&n>=nextId.C)nextId.C=n+1;
-    if(l.mz==='D'&&n>=nextId.D)nextId.D=n+1;
-  });
-}
-function genId(mz){const id=mz+nextId[mz];nextId[mz]++;return id;}
-
-// ── SHEETS ──
-document.getElementById('btn-cargar').onclick=async()=>{
-  const raw=document.getElementById('sheets-url').value.trim();
-  if(!raw){setStatus('Pegá el link de tu Google Sheet primero.','err');return;}
-  localStorage.setItem('barrio_sheets_url',raw);
-  let url=raw;
-  if(url.includes('/edit')||url.includes('/view')){
-    const match=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if(match) url=`https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
-  }
-  setStatus('Cargando datos...','info');
+// ── CARGAR DESDE SHEETS AL ABRIR ──
+async function cargarDesdeSheets(){
+  setLoading(true);
   try{
-    const resp=await fetch(url);
-    if(!resp.ok)throw new Error('No se pudo acceder a la hoja.');
-    const text=await resp.text();
-    const nuevos=csvALotes(text);
-    if(nuevos.length===0)throw new Error('No se encontraron datos. Verificá el formato de la hoja.');
-    lotes=nuevos;
+    const resp = await fetch(CSV_URL+'&t='+Date.now());
+    if(!resp.ok) throw new Error('No se pudo leer la hoja');
+    const text = await resp.text();
+    const nuevos = csvALotes(text);
+    if(nuevos.length===0) throw new Error('Hoja vacía o sin formato correcto');
+    lotes = nuevos;
     recalcNextId();
-    renderMapa();renderLista();guardar();
-    setStatus(`✓ ${lotes.length} lotes cargados correctamente.`,'ok');
-  }catch(e){
-    setStatus('Error: '+e.message,'err');
+    renderMapa();
+    renderLista();
+    setLoading(false);
+  } catch(e){
+    setLoading(false);
+    // si falla sheets, cargamos cache local
+    const cache = localStorage.getItem('barrio_cache');
+    if(cache){ try{ lotes=JSON.parse(cache); recalcNextId(); renderMapa(); renderLista(); }catch(x){} }
+    console.warn('Sheets no disponible, usando cache:', e.message);
   }
-};
+}
 
 function csvALotes(csv){
   const lineas=csv.trim().split('\n');
@@ -381,11 +320,61 @@ function csvALotes(csv){
   return res;
 }
 
-function setStatus(msg,tipo){
-  const b=document.getElementById('status-bar');
-  b.className='status-bar '+tipo;
-  b.textContent=msg;
+// ── GUARDAR EN SHEETS VIA APPS SCRIPT ──
+async function guardarEnSheets(){
+  if(!APPS_SCRIPT_URL){
+    // sin Apps Script: solo guarda local y avisa
+    localStorage.setItem('barrio_cache', JSON.stringify(lotes));
+    setEditStatus('✓ Guardado localmente. Configurá el Apps Script para sincronizar con Sheets.','ok');
+    return true;
+  }
+  setEditStatus('⏳ Guardando en Google Sheets...','info');
+  try{
+    const datos = lotes.map(l=>({
+      manzana: l.mz,
+      lote: l.id.replace(/[CD]/g,''),
+      nombre: l.nom,
+      estado: l.est
+    }));
+    await fetch(APPS_SCRIPT_URL, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({lotes: datos})
+    });
+    localStorage.setItem('barrio_cache', JSON.stringify(lotes));
+    setEditStatus('✓ Guardado en Google Sheets correctamente.','ok');
+    return true;
+  } catch(e){
+    localStorage.setItem('barrio_cache', JSON.stringify(lotes));
+    setEditStatus('⚠️ Error al guardar en Sheets. Cambios guardados localmente.','err');
+    return false;
+  }
 }
+
+function setLoading(v){
+  document.getElementById('loading-bar').classList.toggle('visible',v);
+}
+function setEditStatus(msg,tipo){
+  const b=document.getElementById('edit-status');
+  b.className='edit-status '+tipo;
+  b.textContent=msg;
+  if(tipo==='ok') setTimeout(()=>{b.className='edit-status';},3000);
+}
+
+// ── HELPERS ──
+function lotesOf(mz){return lotes.filter(l=>l.mz===mz);}
+function idxOf(id){return lotes.findIndex(l=>l.id===id);}
+function numLabel(id){return id.replace(/[CD]/g,'');}
+function recalcNextId(){
+  nextId={C:1,D:1};
+  lotes.forEach(l=>{
+    const n=parseInt(l.id.replace(/[CD]/g,''))||0;
+    if(l.mz==='C'&&n>=nextId.C)nextId.C=n+1;
+    if(l.mz==='D'&&n>=nextId.D)nextId.D=n+1;
+  });
+}
+function genId(mz){const id=mz+nextId[mz];nextId[mz]++;return id;}
 
 // ── RENDER ──
 function renderMapa(){
@@ -423,7 +412,7 @@ function renderLista(){
     lista.appendChild(div);
     div.querySelector('input').addEventListener('input',e=>{
       const lo=lotes.find(x=>x.id===e.target.dataset.id);
-      if(lo){lo.nom=e.target.value;renderMapa();guardar();}
+      if(lo){lo.nom=e.target.value;renderMapa();}
     });
     div.querySelector('button').addEventListener('click',e=>goTo(e.currentTarget.dataset.id));
   });
@@ -445,7 +434,6 @@ function entrarEdicion(){
   document.getElementById('btn-editar-toggle').classList.add('activo');
   document.getElementById('btn-editar-toggle').textContent='✓ Editando — salir';
   document.getElementById('panel-sub').textContent='Hacé click en un lote para editarlo';
-  document.getElementById('sheets-panel').classList.add('visible');
   renderMapa();renderLista();
 }
 
@@ -455,7 +443,6 @@ function salirEdicion(){
   document.getElementById('btn-editar-toggle').classList.remove('activo');
   document.getElementById('btn-editar-toggle').textContent='✏️ Editar';
   document.getElementById('panel-sub').textContent='Hacé click en 📍 para ver el lote en el mapa';
-  document.getElementById('sheets-panel').classList.remove('visible');
   document.getElementById('editor').classList.remove('open');
   selId=null;
   renderMapa();renderLista();
@@ -487,18 +474,22 @@ function openEditor(id){
   renderMapa();showBar(l);
   document.getElementById('editor').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
-document.getElementById('ed-guardar').onclick=()=>{
+
+document.getElementById('ed-guardar').onclick=async()=>{
   if(!selId)return;
   const l=lotes.find(x=>x.id===selId);
   l.nom=document.getElementById('ed-nom').value;
   l.est=document.getElementById('ed-est').value;
-  renderMapa();renderLista();showBar(l);guardar();
+  renderMapa();renderLista();showBar(l);
+  await guardarEnSheets();
 };
+
 document.getElementById('ed-cerrar').onclick=()=>{
   document.getElementById('editor').classList.remove('open');
   selId=null;renderMapa();
 };
-document.getElementById('ed-eliminar').onclick=()=>{
+
+document.getElementById('ed-eliminar').onclick=async()=>{
   if(!selId)return;
   const l=lotes.find(x=>x.id===selId);
   if(!confirm(`¿Eliminar Manzana ${l.mz} · Lote ${numLabel(l.id)}${l.nom?' ('+l.nom+')':''}?`))return;
@@ -506,8 +497,10 @@ document.getElementById('ed-eliminar').onclick=()=>{
   selId=null;
   document.getElementById('editor').classList.remove('open');
   document.getElementById('info-bar').style.display='none';
-  renderMapa();renderLista();guardar();
+  renderMapa();renderLista();
+  await guardarEnSheets();
 };
+
 document.getElementById('ed-izq').onclick=()=>{
   if(!selId)return;
   const l=lotes.find(x=>x.id===selId);
@@ -515,8 +508,9 @@ document.getElementById('ed-izq').onclick=()=>{
   if(pos===0)return;
   const gi=idxOf(l.id),pi=idxOf(ml[pos-1].id);
   [lotes[gi],lotes[pi]]=[lotes[pi],lotes[gi]];
-  renderMapa();renderLista();guardar();
+  renderMapa();renderLista();
 };
+
 document.getElementById('ed-der').onclick=()=>{
   if(!selId)return;
   const l=lotes.find(x=>x.id===selId);
@@ -524,7 +518,7 @@ document.getElementById('ed-der').onclick=()=>{
   if(pos===ml.length-1)return;
   const gi=idxOf(l.id),ni=idxOf(ml[pos+1].id);
   [lotes[gi],lotes[ni]]=[lotes[ni],lotes[gi]];
-  renderMapa();renderLista();guardar();
+  renderMapa();renderLista();
 };
 
 // ── AGREGAR LOTE ──
@@ -538,13 +532,14 @@ function abrirModal(mz){
   document.getElementById('modal-lote').classList.add('open');
 }
 document.getElementById('modal-cancel').onclick=()=>document.getElementById('modal-lote').classList.remove('open');
-document.getElementById('modal-ok').onclick=()=>{
+document.getElementById('modal-ok').onclick=async()=>{
   const nom=document.getElementById('modal-nom').value.trim();
   const est=document.getElementById('modal-est').value;
   const id=genId(modalMz);
   lotes.push({id,mz:modalMz,est,nom});
   document.getElementById('modal-lote').classList.remove('open');
-  renderMapa();renderLista();guardar();
+  renderMapa();renderLista();
+  await guardarEnSheets();
   setTimeout(()=>goTo(id),100);
 };
 document.getElementById('modal-lote').onclick=e=>{
@@ -567,9 +562,8 @@ function showBar(l){
   bar.textContent=`Manzana ${l.mz} · Lote ${numLabel(l.id)} · ${ETI[l.est]}${l.nom?' · '+l.nom:''}`;
 }
 
-cargarLocal();
-renderMapa();
-renderLista();
+// ── ARRANCAR ──
+cargarDesdeSheets();
 </script>
 </body>
 </html>
